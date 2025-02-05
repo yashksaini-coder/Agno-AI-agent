@@ -1,0 +1,11 @@
+fastapi
+agno
+yfinance
+packaging
+duckduckgo-search
+pgvector
+pypdf
+psycopg[binary]
+sqlalchemy
+uvicorn
+groq
