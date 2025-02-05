@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-GROQ_API_KEY = "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"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Web searching agent
 web_search_agent = Agent(
