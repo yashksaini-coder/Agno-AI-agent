@@ -6,11 +6,8 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise ValueError("Please provide a GROQ API key")
-    exit(1)
-    
+GROQ_API_KEY = "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"
+
 # Web searching agent
 web_search_agent = Agent(
     name="web_agent",
@@ -38,16 +35,3 @@ financial_agent = Agent(
     markdown=True,
 )
 
-multiple_agents = Agent(
-    team=[web_search_agent, financial_agent],
-    model=Groq(id="llama-3.3-70b-versatile",api_key=GROQ_API_KEY),
-    markdown=True,
-    instructions=[
-        "Always include and show source data",
-        "Please provide the stock ticker symbol you would like to get information on",
-        "use tables to display the data",
-    ],
-)
-
-
-multiple_agents.print_response("summarize the stock market today for the stock AAPL")
