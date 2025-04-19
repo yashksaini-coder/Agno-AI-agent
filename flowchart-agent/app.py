@@ -1,15 +1,16 @@
 import streamlit as st
 import time
-from typing import Optional
-from agno.agent import Agent
+from typing import Optional, Iterator
+from agno.agent import Agent, RunResponse
 from agno.models.groq import Groq
 from agno.tools.duckduckgo import DuckDuckGoTools
 from dotenv import load_dotenv
 import os
 from agno.playground import Playground, serve_playground_app
-from typing import Iterator
-from agno.agent import Agent, RunResponse
 from agno.utils.pprint import pprint_run_response
+import re
+from streamlit_mermaid import st_mermaid
+import uuid
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -20,38 +21,52 @@ if not (GROQ_API_KEY and AGNO_API_KEY):
     raise ValueError("Please provide proper API key credentials")
     exit(1)
 
-
-
-flowchart_agent = Agent(
-    name="flowchart_agent",
-    role="get flowchart information",
+mermaid_agent = Agent(
+    name="Mermaid Flowchart Agent",
+    role="get mermaid diagram information",
     model=Groq(id=MODEL,api_key=GROQ_API_KEY),
     tools=[DuckDuckGoTools()],
     instructions="""
-    You are a professional Senio God level full stack Developer. Designed countless SaaS application products and have 1000+ hours of experience in the field.
-    You are also a expert in the field of flowchart and diagram. Design flowchart and diagrams for the applications that based on the user's request.
-    You also know a lot about the latest technologies frameworks and trends in the field of software development.
-    Your current role is to design flowchart and diagrams for the applications that based on the user's request.
-    The designs you create should be professional and modern. 
-    They must be written in the proper language syntax of mermaid markdown format.
-    Based on the user's request, you will design the flowchart and diagrams for the applications.
-    They can be in different styles such as using the flowchart, graph, sequence diagram, etc.
-    The flowcahrts create must be in the proper language syntax of mermaid markdown format. and should be rendered properly.
+    You are a professional Senior God level full stack Developer. Designed countless SaaS application products and have 1000+ hours of experience in the field.
+    You are also an expert in the field of flowchart and diagram design.
+    Your current role is to design flowcharts and diagrams for applications based on user requests.
+    The designs you create should be professional and modern.
+    You must respond with a Mermaid diagram in the following format:
+    
+    ```mermaid
+    [Your Mermaid diagram code here]
+    ```
+    
+    Follow these guidelines:
+    1. Use appropriate Mermaid syntax (flowchart, sequence diagram, class diagram, etc.)
+    2. Include clear node labels and connections
+    3. Use proper indentation and formatting
+    4. Add comments to explain complex parts
+    5. Ensure the diagram is readable and well-structured
+    
+    After the diagram, provide a brief explanation of the design.
     """,
     markdown=True,
 )
 
-
 # Page config
 st.set_page_config(
-    page_title="AI Agent Chat",
-    page_icon="🤖",
+    page_title="AI Flowchart Generator",
+    page_icon="📊",
     layout="wide"
 )
 
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "current_diagram" not in st.session_state:
+    st.session_state.current_diagram = None
+if "diagram_key" not in st.session_state:
+    st.session_state.diagram_key = str(uuid.uuid4())
+if "diagram_count" not in st.session_state:
+    st.session_state.diagram_count = 0
+if "diagram_explanation" not in st.session_state:
+    st.session_state.diagram_explanation = ""
 
 # Sidebar
 with st.sidebar:
@@ -60,7 +75,7 @@ with st.sidebar:
     # Agent selection
     agent = st.selectbox(
         "Select AI Agent",
-        ["flowchart_agent"],
+        ["Mermaid Flowchart Agent"],
         index=0
     )
 
@@ -70,46 +85,94 @@ with st.sidebar:
         index=0
     )
     
+    # Diagram Settings
+    st.subheader("Diagram Settings")
+    diagram_height = st.slider("Diagram Height", 200, 800, 400, 50)
+    show_controls = st.checkbox("Show Diagram Controls", value=True)
+    
     # API Status
     st.subheader("API Status")
     status_placeholder = st.empty()
     
-    # Simulate API status check
     def check_api_status():
         status_placeholder.info("Checking API status...")
-        time.sleep(1)  # Simulate API check
+        time.sleep(1)
         status_placeholder.success("API Connected ✅")
     
     check_api_status()
 
 # Main content area
-st.title("AI Agent Chat Interface")
+st.title("AI Flowchart Generator")
 
 # Chat input
 user_input = st.text_area(
-    "Enter your message",
-    placeholder="Type your message here...",
+    "Enter your flowchart request",
+    placeholder="Describe the flowchart or diagram you want to create...",
     height=100
 )
 
 # Generate button
-if st.button("Generate Response", type="primary"):
+if st.button("Generate Flowchart", type="primary"):
     if user_input:
-        with st.spinner("Generating response..."):
-            # Clear previous messages
+        with st.spinner("Generating flowchart..."):
+            # Clear previous messages and diagram
             st.session_state.messages = []
+            st.session_state.current_diagram = None
+            st.session_state.diagram_key = str(uuid.uuid4())
+            st.session_state.diagram_count = 0
+            st.session_state.diagram_explanation = ""
             
             # Add user message to chat
             st.session_state.messages.append({"role": "user", "content": user_input})
             
             # Get AI response
-            response_stream: Iterator[RunResponse] = flowchart_agent.run(user_input, stream=True)
-            pprint_run_response(response_stream)
+            response_stream: Iterator[RunResponse] = mermaid_agent.run(user_input, stream=True)
+            full_response = ""
+            
+            # Create containers for response and diagram
+            response_container = st.container()
+            diagram_container = st.container()
+            
+            with response_container:
+                for response in response_stream:
+                    if response.content:
+                        full_response += response.content
+                        # Try to find Mermaid diagram in the response
+                        mermaid_match = re.search(r'```mermaid\n(.*?)\n```', full_response, re.DOTALL)
+                        if mermaid_match:
+                            diagram_code = mermaid_match.group(1)
+                            st.session_state.current_diagram = diagram_code
+                            st.session_state.diagram_count += 1
+                            
+                            with diagram_container:
+                                st.subheader("Generated Diagram")
+                                st_mermaid(
+                                    diagram_code,
+                                    height=diagram_height,
+                                    show_controls=show_controls,
+                                    key=f"mermaid_{st.session_state.diagram_key}_{st.session_state.diagram_count}"
+                                )
+                
+                # Extract explanation (text after the diagram)
+                explanation = re.sub(r'```mermaid\n.*?\n```', '', full_response, flags=re.DOTALL).strip()
+                if explanation:
+                    st.session_state.diagram_explanation = explanation
+                    st.subheader("Diagram Explanation")
+                    st.markdown(explanation)
     
     else:
-        st.warning("Please enter a message first!")
+        st.warning("Please enter a flowchart request first!")
 
-# Display chat history
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+# Display current diagram if exists
+if st.session_state.current_diagram:
+    st.subheader("Current Flowchart")
+    st_mermaid(
+        st.session_state.current_diagram,
+        height=diagram_height,
+        show_controls=show_controls,
+        key=f"current_mermaid_{st.session_state.diagram_key}"
+    )
+    
+    if st.session_state.diagram_explanation:
+        st.subheader("Diagram Explanation")
+        st.markdown(st.session_state.diagram_explanation)
