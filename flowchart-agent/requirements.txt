@@ -1,0 +1,12 @@
+fastapi
+agno
+yfinance
+packaging
+duckduckgo-search
+pgvector
+pypdf
+psycopg[binary]
+sqlalchemy
+uvicorn
+groq
+streamlit>=1.32.0
