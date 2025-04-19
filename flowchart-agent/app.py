@@ -17,6 +17,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 AGNO_API_KEY = os.getenv("AGNO_API_KEY")
 MODEL = 'llama-3.3-70b-versatile'
 
+
+
 if not (GROQ_API_KEY and AGNO_API_KEY):
     raise ValueError("Please provide proper API key credentials")
     exit(1)
@@ -61,12 +63,10 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "current_diagram" not in st.session_state:
     st.session_state.current_diagram = None
-if "diagram_key" not in st.session_state:
-    st.session_state.diagram_key = str(uuid.uuid4())
-if "diagram_count" not in st.session_state:
-    st.session_state.diagram_count = 0
 if "diagram_explanation" not in st.session_state:
     st.session_state.diagram_explanation = ""
+if "diagram_key" not in st.session_state:
+    st.session_state.diagram_key = str(uuid.uuid4())
 
 # Sidebar
 with st.sidebar:
@@ -115,11 +115,10 @@ user_input = st.text_area(
 if st.button("Generate Flowchart", type="primary"):
     if user_input:
         with st.spinner("Generating flowchart..."):
-            # Clear previous messages and diagram
+            # Clear previous content
             st.session_state.messages = []
             st.session_state.current_diagram = None
             st.session_state.diagram_key = str(uuid.uuid4())
-            st.session_state.diagram_count = 0
             st.session_state.diagram_explanation = ""
             
             # Add user message to chat
@@ -129,50 +128,31 @@ if st.button("Generate Flowchart", type="primary"):
             response_stream: Iterator[RunResponse] = mermaid_agent.run(user_input, stream=True)
             full_response = ""
             
-            # Create containers for response and diagram
-            response_container = st.container()
-            diagram_container = st.container()
+            # First collect the complete response
+            for response in response_stream:
+                if response.content:
+                    full_response += response.content
             
-            with response_container:
-                for response in response_stream:
-                    if response.content:
-                        full_response += response.content
-                        # Try to find Mermaid diagram in the response
-                        mermaid_match = re.search(r'```mermaid\n(.*?)\n```', full_response, re.DOTALL)
-                        if mermaid_match:
-                            diagram_code = mermaid_match.group(1)
-                            st.session_state.current_diagram = diagram_code
-                            st.session_state.diagram_count += 1
-                            
-                            with diagram_container:
-                                st.subheader("Generated Diagram")
-                                st_mermaid(
-                                    diagram_code,
-                                    height=diagram_height,
-                                    show_controls=show_controls,
-                                    key=f"mermaid_{st.session_state.diagram_key}_{st.session_state.diagram_count}"
-                                )
+            # Extract diagram and explanation
+            mermaid_match = re.search(r'```mermaid\n(.*?)\n```', full_response, re.DOTALL)
+            if mermaid_match:
+                diagram_code = mermaid_match.group(1)
+                st.session_state.current_diagram = diagram_code
                 
-                # Extract explanation (text after the diagram)
-                explanation = re.sub(r'```mermaid\n.*?\n```', '', full_response, flags=re.DOTALL).strip()
-                if explanation:
-                    st.session_state.diagram_explanation = explanation
-                    st.subheader("Diagram Explanation")
-                    st.markdown(explanation)
-    
+                # Display the diagram
+                st.subheader("Generated Diagram")
+                st_mermaid(
+                    diagram_code,
+                    height=diagram_height,
+                    show_controls=show_controls,
+                    key=f"mermaid_{st.session_state.diagram_key}"
+                )
+            
+            # Extract and display explanation
+            explanation = re.sub(r'```mermaid\n.*?\n```', '', full_response, flags=re.DOTALL).strip()
+            if explanation:
+                st.session_state.diagram_explanation = explanation
+                st.subheader("Diagram Explanation")
+                st.markdown(explanation)
     else:
         st.warning("Please enter a flowchart request first!")
-
-# Display current diagram if exists
-if st.session_state.current_diagram:
-    st.subheader("Current Flowchart")
-    st_mermaid(
-        st.session_state.current_diagram,
-        height=diagram_height,
-        show_controls=show_controls,
-        key=f"current_mermaid_{st.session_state.diagram_key}"
-    )
-    
-    if st.session_state.diagram_explanation:
-        st.subheader("Diagram Explanation")
-        st.markdown(st.session_state.diagram_explanation)
