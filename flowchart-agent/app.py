@@ -3,6 +3,7 @@ import time
 from typing import Optional, Iterator
 from agno.agent import Agent, RunResponse
 from agno.models.groq import Groq
+from agno.models.google import Gemini
 from agno.tools.duckduckgo import DuckDuckGoTools
 from dotenv import load_dotenv
 import os
@@ -14,19 +15,107 @@ import uuid
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-AGNO_API_KEY = os.getenv("AGNO_API_KEY")
-MODEL = 'llama-3.3-70b-versatile'
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# Model configurations
+MODEL_CONFIGS = {
+    "Groq": {
+        "models": [
+            "llama-3.3-70b-versatile",
+            "llama-3.3-8b-versatile",
+            "mixtral-8x7b-32768",
+            "gemma-7b-it"
+        ],
+        "api_key": GROQ_API_KEY,
+        "model_class": Groq
+    },
+    "Gemini": {
+        "models": [
+            "gemini-1.5-pro",
+            "gemini-1.5-flash",
+            "gemini-1.0-pro"
 
+        ],
+        "api_key": GEMINI_API_KEY,
+        "model_class": Gemini
+    }
+}
 
-if not (GROQ_API_KEY and AGNO_API_KEY):
+if not (GROQ_API_KEY or GEMINI_API_KEY):
     raise ValueError("Please provide proper API key credentials")
     exit(1)
 
+# Page config
+st.set_page_config(
+    page_title="AI Flowchart Generator",
+    page_icon="📊",
+    layout="wide"
+)
+
+# Initialize session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "current_diagram" not in st.session_state:
+    st.session_state.current_diagram = None
+if "diagram_explanation" not in st.session_state:
+    st.session_state.diagram_explanation = ""
+if "diagram_key" not in st.session_state:
+    st.session_state.diagram_key = str(uuid.uuid4())
+if "llm_provider" not in st.session_state:
+    st.session_state.llm_provider = "Groq"
+if "selected_model" not in st.session_state:
+    st.session_state.selected_model = MODEL_CONFIGS["Groq"]["models"][0]
+
+# Sidebar
+with st.sidebar:
+    st.title("AI Agent Settings")
+    
+    # LLM Provider selection
+    provider = st.selectbox(
+        "Select LLM Provider",
+        list(MODEL_CONFIGS.keys()),
+        index=list(MODEL_CONFIGS.keys()).index(st.session_state.llm_provider),
+        key="llm_provider"
+    )
+    
+    # Update available models based on provider
+    available_models = MODEL_CONFIGS[provider]["models"]
+    model = st.selectbox(
+        "Select Model",
+        available_models,
+        index=available_models.index(st.session_state.selected_model) if st.session_state.selected_model in available_models else 0,
+        key="selected_model"
+    )
+    
+    # Agent selection
+    agent = st.selectbox(
+        "Select AI Agent",
+        ["Mermaid Flowchart Agent"],
+        index=0
+    )
+    
+    # Diagram Settings
+    st.subheader("Diagram Settings")
+    diagram_height = st.slider("Diagram Height", 200, 800, 600, 50)
+    show_controls = st.checkbox("Show Diagram Controls", value=True)
+    
+    # API Status
+    st.subheader("API Status")
+    status_placeholder = st.empty()
+    
+    def check_api_status():
+        status_placeholder.info("Checking API status...")
+        time.sleep(1)
+        status_placeholder.success("API Connected ✅")
+    
+    check_api_status()
+
+# Initialize agent with selected model
+selected_config = MODEL_CONFIGS[st.session_state.llm_provider]
 mermaid_agent = Agent(
     name="Mermaid Flowchart Agent",
     role="get mermaid diagram information",
-    model=Groq(id=MODEL,api_key=GROQ_API_KEY),
+    model=selected_config["model_class"](id=st.session_state.selected_model, api_key=selected_config["api_key"]),
     tools=[DuckDuckGoTools()],
     instructions="""
     You are a professional Senior God level full stack Developer. Designed countless SaaS application products and have 1000+ hours of experience in the field.
@@ -50,56 +139,6 @@ mermaid_agent = Agent(
     """,
     markdown=True,
 )
-
-# Page config
-st.set_page_config(
-    page_title="AI Flowchart Generator",
-    page_icon="📊",
-    layout="wide"
-)
-
-# Initialize session state
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "current_diagram" not in st.session_state:
-    st.session_state.current_diagram = None
-if "diagram_explanation" not in st.session_state:
-    st.session_state.diagram_explanation = ""
-if "diagram_key" not in st.session_state:
-    st.session_state.diagram_key = str(uuid.uuid4())
-
-# Sidebar
-with st.sidebar:
-    st.title("AI Agent Settings")
-    
-    # Agent selection
-    agent = st.selectbox(
-        "Select AI Agent",
-        ["Mermaid Flowchart Agent"],
-        index=0
-    )
-
-    MODEL = st.selectbox(
-        "Select Model",
-        ["llama-3.3-70b-versatile", "llama-3.3-8b-versatile"],
-        index=0
-    )
-    
-    # Diagram Settings
-    st.subheader("Diagram Settings")
-    diagram_height = st.slider("Diagram Height", 200, 800, 400, 50)
-    show_controls = st.checkbox("Show Diagram Controls", value=True)
-    
-    # API Status
-    st.subheader("API Status")
-    status_placeholder = st.empty()
-    
-    def check_api_status():
-        status_placeholder.info("Checking API status...")
-        time.sleep(1)
-        status_placeholder.success("API Connected ✅")
-    
-    check_api_status()
 
 # Main content area
 st.title("AI Flowchart Generator")
