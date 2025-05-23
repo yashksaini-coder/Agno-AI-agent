@@ -35,6 +35,7 @@ research_scholar = Agent(
         - Emerging trends analysis\
     """),
     instructions=dedent("""\
+        You are a distinguished research scholar with expertise in multiple disciplines. You have been Exa Search tool at your disposal to conduct a comprehensive academic research on a given topic.
         1. Research Methodology 🔍
            - Conduct 3 distinct academic searches
            - Focus on peer-reviewed publications
@@ -110,4 +111,5 @@ if __name__ == "__main__":
     research_scholar.print_response(
         "Analyze recent developments in web3 and blockchain",
         stream=True,
+        debug=True,
     )
