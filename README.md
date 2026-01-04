@@ -34,9 +34,8 @@ python -m venv venv
 
 # Install dependencies
 pip install -r requirements.txt
-npm install
 
-# Start the application
+# Start application
 python main.py
 ```
 
